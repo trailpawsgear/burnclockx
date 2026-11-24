@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BurnClockX — See what this meeting is really costing</title>
+<meta name="description" content="A free, private meeting cost calculator. Add attendees, see the cost climb in real time, screenshot it, share it.">
+<link rel="canonical" href="https://burnclockx.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="BurnClockX">
+<meta property="og:url" content="https://burnclockx.com/">
+<meta property="og:title" content="BurnClockX — See what this meeting is really costing">
+<meta property="og:description" content="A free, private meeting cost calculator. Add attendees, see the cost climb in real time, screenshot it, share it.">
+<meta property="og:image" content="https://burnclockx.com/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BurnClockX — See what this meeting is really costing">
+<meta name="twitter:description" content="A free, private meeting cost calculator. Add attendees, see the cost climb in real time, screenshot it, share it.">
+<style>
+  :root{
+    --bg:#0b0d12; --panel:#12151c; --panel2:#171b24; --text:#f2f3f5; --muted:#9aa3b2;
+    --accent:#ff5d5d; --accent2:#3ddc97; --border:#232836;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  .wrap{max-width:760px;margin:0 auto;padding:32px 16px 80px}
+  header{text-align:center;margin-bottom:28px}
+  h1{font-size:1.6rem;margin:0 0 6px}
+  header p{color:var(--muted);margin:0;font-size:.95rem}
+  .cost-display{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:32px 20px;text-align:center;margin-bottom:24px}
+  .cost-amount{font-size:3.2rem;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-1px}
+  .cost-amount.running{color:var(--accent)}
+  .cost-sub{color:var(--muted);font-size:.9rem;margin-top:6px}
+  .controls{display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap}
+  button{font:inherit;cursor:pointer;border:none;border-radius:10px;padding:12px 22px;font-weight:600;font-size:.95rem}
+  .btn-start{background:var(--accent2);color:#06241a}
+  .btn-stop{background:var(--accent);color:#2a0606}
+  .btn-reset{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:20px}
+  .panel h2{font-size:1rem;margin:0 0 14px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .row{display:flex;gap:10px;margin-bottom:10px;align-items:center}
+  .row input{flex:1;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 12px;font:inherit}
+  .row input.rate{max-width:110px;flex:none}
+  .row .remove{background:none;border:none;color:var(--muted);font-size:1.2rem;padding:4px 8px}
+  .add-row{background:var(--panel2);border:1px dashed var(--border);color:var(--muted);width:100%;text-align:left}
+  .currency-select{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font:inherit}
+  footer{text-align:center;color:var(--muted);font-size:.8rem;margin-top:30px}
+  footer a{color:var(--muted)}
+  .screenshot-hint{text-align:center;color:var(--muted);font-size:.8rem;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>BurnClockX</h1>
+    <p>Add the people in the room, press start, watch the real cost of this meeting climb.</p>
+  </header>
+
+  <div class="cost-display">
+    <div class="cost-amount" id="costAmount">€0.00</div>
+    <div class="cost-sub" id="costSub">0:00 elapsed · 0 attendees</div>
+    <div class="controls">
+      <button class="btn-start" id="startBtn">Start meeting</button>
+      <button class="btn-stop" id="stopBtn" style="display:none">Stop</button>
+      <button class="btn-reset" id="resetBtn">Reset</button>
+    </div>
+    <div class="screenshot-hint">Running total updates every second. Screenshot it at the end and drop it in the retro doc.</div>
+  </div>
+
+  <div class="panel">
+    <h2>Attendees</h2>
+    <div id="rows"></div>
+    <button class="add-row" id="addRow">+ Add attendee</button>
+  </div>
+
+  <div class="panel">
+    <h2>Currency</h2>
+    <select class="currency-select" id="currency">
+      <option value="€">EUR (€)</option>
+      <option value="$">USD ($)</option>
+      <option value="£">GBP (£)</option>
+    </select>
+    <p style="color:var(--muted);font-size:.85rem;margin:10px 0 0">
+      Rate is per hour, per person. No fully-loaded cost math here on purpose, just salary ÷ hours worked in a year, times how many people are in the room.
+    </p>
+  </div>
+
+  <footer>
+    Nothing you type here leaves your browser. No account, no tracking, no data sent anywhere.
+    <br><a href="https://burnclockx.com">burnclockx.com</a>
+  </footer>
+</div>
+
+<script>
+(function(){
+  const rowsEl = document.getElementById('rows');
+  const addRowBtn = document.getElementById('addRow');
+  const costAmount = document.getElementById('costAmount');
+  const costSub = document.getElementById('costSub');
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const currencySel = document.getElementById('currency');
+
+  let timer = null;
+  let elapsedSeconds = 0;
+  let running = false;
+
+  function addRow(name, rate){
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `
+      <input type="text" placeholder="Role or name" class="name" value="${name||''}">
+      <input type="number" placeholder="€/hr" class="rate" min="0" step="1" value="${rate!=null?rate:50}">
+      <button class="remove" title="Remove">×</button>
+    `;
+    row.querySelector('.remove').addEventListener('click', ()=>{ row.remove(); updateDisplay(); });
+    row.querySelectorAll('input').forEach(i=> i.addEventListener('input', updateDisplay));
+    rowsEl.appendChild(row);
+    updateDisplay();
+  }
+
+  addRowBtn.addEventListener('click', ()=> addRow());
+  addRow('Facilitator', 60);
+  addRow('Attendee', 45);
+  addRow('Attendee', 45);
+
+  function getRatesPerSecond(){
+    const rates = [...rowsEl.querySelectorAll('.row')].map(r=>{
+      const rate = parseFloat(r.querySelector('.rate').value) || 0;
+      return rate / 3600;
+    });
+    return rates.reduce((a,b)=>a+b, 0);
+  }
+
+  function formatTime(s){
+    const m = Math.floor(s/60), sec = s%60;
+    return m + ':' + String(sec).padStart(2,'0');
+  }
+
+  function updateDisplay(){
+    const perSecond = getRatesPerSecond();
+    const cost = perSecond * elapsedSeconds;
+    const symbol = currencySel.value;
+    costAmount.textContent = symbol + cost.toFixed(2);
+    costAmount.classList.toggle('running', running);
+    const count = rowsEl.querySelectorAll('.row').length;
+    costSub.textContent = formatTime(elapsedSeconds) + ' elapsed · ' + count + ' attendee' + (count===1?'':'s');
+  }
+
+  currencySel.addEventListener('change', updateDisplay);
+
+  startBtn.addEventListener('click', ()=>{
+    running = true;
+    startBtn.style.display = 'none';
+    stopBtn.style.display = 'inline-block';
+    timer = setInterval(()=>{ elapsedSeconds++; updateDisplay(); }, 1000);
+  });
+
+  stopBtn.addEventListener('click', ()=>{
+    running = false;
+    clearInterval(timer);
+    startBtn.style.display = 'inline-block';
+    stopBtn.style.display = 'none';
+    updateDisplay();
+  });
+
+  resetBtn.addEventListener('click', ()=>{
+    running = false;
+    clearInterval(timer);
+    elapsedSeconds = 0;
+    startBtn.style.display = 'inline-block';
+    stopBtn.style.display = 'none';
+    updateDisplay();
+  });
+
+  updateDisplay();
+})();
+</script>
+</body>
+</html>
